@@ -1,0 +1,25 @@
+# Environment files
+.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+lib/
+lib64/
+
+# Version control
+.git
+.gitignore
+
+# OS generated files
+.DS_Store
+.DS_Store?

@@ -1,0 +1,16 @@
+requests==2.31.0
+python-dotenv==1.0.0
+openai==1.82.1
+beautifulsoup4==4.12.3
+markdown==3.5.2
+python-frontmatter==1.1.0
+html2text==2020.1.16
+zenpy==2.0.25
+python-slugify==8.0.4
+tqdm==4.66.2
+httpx==0.27.2 
+flask>=3.0.0
+argparse
+datadog_api_client
+Flask-APScheduler==1.13.1
+gunicorn
