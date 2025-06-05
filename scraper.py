@@ -19,33 +19,46 @@ from config import COUNT_ARTICLES, ZENDESK_EMAIL, ZENDESK_TOKEN, ZENDESK_SUBDOMA
 
 class ArticleScraper:
   def __init__(self):
-    self.zendeskClient = Zenpy(
+    # self.logger = initLogger('optisigns', 'development')
+    self.logger = getLogger('optisigns', 'development')
+
+    self.zendeskClient = self.initZendeskClient()
+
+    self.files = {
+      'skipped': [],
+      'modified': [],
+      'added': []
+    }
+        
+    self.outputDir = self.setupOutputDirectory()
+
+    self.htmlConverter = self.setupHtmlConverter()
+
+    self.urlReferences = {}
+
+  def initZendeskClient(self) -> Zenpy:
+    return Zenpy(
       email=ZENDESK_EMAIL,
       token=ZENDESK_TOKEN,
       subdomain=ZENDESK_SUBDOMAIN
     )
-    self.skippedFiles = []
-    self.modifededFiles = []
-    self.addedFiles = []
-    self.outputDir = Path(OUTPUT_DIR)
-    self.outputDir.mkdir(exist_ok=True)
-    self.htmlConverter = html2text.HTML2Text()
-    self.htmlConverter.bodyWidth = 0
-    self.setupHtmlConverter()
-    # self.logger = initLogger('optisigns', 'development')
-    self.logger = getLogger('optisigns', 'development')
-    self.logger.info("Init articles...")
-    self.urlReferences = {}
+  
+  def setupOutputDirectory(self) -> Path:
+    outputDir = Path(OUTPUT_DIR)
+    outputDir.mkdir(exist_ok=True)
+    return outputDir
 
-  def setupHtmlConverter(self):
-    """Configure HTML to Markdown converter settings"""
-    self.htmlConverter.unicode_snob = True
-    self.htmlConverter.ignore_links = False
-    self.htmlConverter.ignore_images = False
-    self.htmlConverter.ignore_emphasis = False
-    self.htmlConverter.ignore_tables = False
-    self.htmlConverter.wrap_links = False  # Keep URLs inline
-    self.htmlConverter.inline_links = False  # Use reference-style links
+  def setupHtmlConverter(self) -> html2text.HTML2Text:
+    htmlConverter = html2text.HTML2Text()
+    htmlConverter.bodyWidth = 0
+    htmlConverter.unicode_snob = True
+    htmlConverter.ignore_links = False
+    htmlConverter.ignore_images = False
+    htmlConverter.ignore_emphasis = False
+    htmlConverter.ignore_tables = False
+    htmlConverter.wrap_links = False  # Keep URLs inline
+    htmlConverter.inline_links = False  # Use reference-style links
+    return htmlConverter
     
   def getArticleHash(self, content: str) -> str:
     """Generate hash for article content"""
@@ -57,15 +70,15 @@ class ArticleScraper:
     
     # Add overview section
     sections.append("## Overview\n")
-    
+
     # Extract and organize content sections
-    content_parts = re.split(r'^#{2,3}\s+(.+)$', markdown, flags=re.MULTILINE)
-    if len(content_parts) > 1:
-      for i in range(1, len(content_parts), 2):
-        header = content_parts[i]
-        content = content_parts[i+1].strip() if i+1 < len(content_parts) else ""
+    contentParts = re.split(r'^#{2,3}\s+(.+)$', markdown, flags=re.MULTILINE)
+    if len(contentParts) > 1:
+      for i in range(1, len(contentParts), 2):
+        header = contentParts[i]
+        content = contentParts[i+1].strip() if i+1 < len(contentParts) else ""
         sections.append(f"## {header}\n\n{content}\n")
-    
+
     return "\n".join(sections)
 
   def cleanHtml(self, html: str) -> str:
@@ -103,8 +116,7 @@ class ArticleScraper:
     
     # Extract links
     for i, link in enumerate(soup.find_all('a', href=True)):
-      ref_id = f"link{i+1}"
-      urls[ref_id] = {
+      urls[f"link{i+1}"] = {
         'url': link['href'],
         'text': link.get_text(strip=True),
         'title': link.get('title', '')
@@ -112,8 +124,7 @@ class ArticleScraper:
     
     # Extract images
     for i, img in enumerate(soup.find_all('img', src=True)):
-      ref_id = f"img{i+1}"
-      urls[ref_id] = {
+      urls[f"img{i+1}"] = {
         'url': img['src'],
         'text': img.get('alt', 'Image'),
         'title': img.get('title', '')
@@ -130,12 +141,12 @@ class ArticleScraper:
     references.append("| Reference ID | Type | Description | URL |")
     references.append("|-------------|------|-------------|-----|")
     
-    for ref_id, info in urls.items():
-      url_type = "Image" if ref_id.startswith("img") else "Link"
+    for refId, info in urls.items():
+      urlType = "Image" if refId.startswith("img") else "Link"
       description = info['text']
       if info['title']:
         description += f" ({info['title']})"
-      references.append(f"| {ref_id} | {url_type} | {description} | {info['url']} |")
+      references.append(f"| {refId} | {urlType} | {description} | {info['url']} |")
     
     return "\n".join(references)
 
@@ -174,9 +185,9 @@ class ArticleScraper:
     
     return [f for f in directory.glob('**/*') if f.is_file()]
 
-  def pathToDict(self, file_path: Path) -> Dict:
+  def pathToDict(self, filePath: Path) -> Dict:
     try:
-      post = frontmatter.load(file_path)
+      post = frontmatter.load(filePath)
       metadata = post.metadata
       content = post.content
       return {
@@ -189,7 +200,7 @@ class ArticleScraper:
         'body': content
       }
     except Exception as e:
-      print(f"Error reading file {file_path}: {e}")
+      print(f"Error reading file {filePath}: {e}")
       return {}
 
   def getFileBySlug(self, directoryPath = '', slug = ''):
@@ -236,31 +247,28 @@ class ArticleScraper:
   def saveArticle(self, articleData: Dict) -> Path:
     slug = slugify(articleData['title'])
     filePath = self.outputDir / f"{slug}.md"
+    # Need refactor
     checkedFile = self.getFileBySlug('./articles', slug)
+
     if len(checkedFile) > 0:
       existedFile = self.pathToDict(checkedFile[0])
       if self.checkModifiedFile(articleData, existedFile):
-        self.modifededFiles.append(filePath)
+        self.files['modified'].append(filePath)
         self.formatAndSaveArticle(filePath, articleData)
         return filePath
       else:
-        self.skippedFiles.append(filePath)
+        self.files['skipped'].append(filePath)
         return filePath
     else:
       self.formatAndSaveArticle(filePath, articleData)
-      self.addedFiles.append(filePath)
+      self.files['added'].append(filePath)
     return filePath
 
   def scrapeArticles(self) -> List[Path]:
     articles = self.zendeskClient.help_center.articles()[0: COUNT_ARTICLES]
     self.saveArticles(articles)
 
-    self.logger.info(f"added: {len(self.addedFiles)}")
-    self.logger.info(f"updated: {len(self.modifededFiles)}")
-    self.logger.info(f"skipped: {len(self.skippedFiles)}")
+    for status, files in self.files.items():
+      self.logger.info(f"{status}: {len(files)}")
 
-    self.logger.debug(f"added: {len(self.addedFiles)}")
-    self.logger.debug(f"updated: {len(self.modifededFiles)}")
-    self.logger.debug(f"skipped: {len(self.skippedFiles)}")
-
-    return self.addedFiles + self.modifededFiles
+    return self.files['added'] + self.files['modified']

@@ -30,7 +30,7 @@ def handle():
     print(f"Error in scraping job: {str(e)}")
     return False
 
-@scheduler.task('cron', id='my_daily_job', hour='*/1')
+@scheduler.task('cron', id='my_daily_job', second='*/5')
 def dailyJob():
   handle()
 
