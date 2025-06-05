@@ -13,6 +13,8 @@ from config import PORT, SCHEDULE_CONFIG
 app = Flask(__name__)
 app.config.from_object(SCHEDULE_CONFIG())
 scheduler = APScheduler()
+scheduler.init_app(app)
+scheduler.start()
 
 def handle():
   try:
@@ -28,7 +30,7 @@ def handle():
     print(f"Error in scraping job: {str(e)}")
     return False
 
-@scheduler.task('cron', id='my_daily_job', minute='*/10')
+@scheduler.task('cron', id='my_daily_job', hour='*/1')
 def dailyJob():
   handle()
 
@@ -41,9 +43,6 @@ def healthCheck():
   return 'OK'
 
 if __name__ == "__main__":
-  scheduler.init_app(app)
-  scheduler.start()
-
   parser = argparse.ArgumentParser()
   parser.add_argument('--cron', action='store_true', help='Run in cron mode')
   args = parser.parse_args()
@@ -52,5 +51,4 @@ if __name__ == "__main__":
     success = handle()
     sys.exit(0 if success else 1)
   else:
-    port = PORT
     app.run(host='0.0.0.0', port=PORT, debug=False)

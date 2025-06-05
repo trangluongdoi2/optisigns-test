@@ -33,7 +33,8 @@ class ArticleScraper:
     self.htmlConverter.bodyWidth = 0
     self.setupHtmlConverter()
     # self.logger = initLogger('optisigns', 'development')
-    self.logger = getLogger('optisigns', 'production')
+    self.logger = getLogger('optisigns', 'development')
+    self.logger.info("Init articles...")
     self.urlReferences = {}
 
   def setupHtmlConverter(self):
@@ -257,4 +258,9 @@ class ArticleScraper:
     self.logger.info(f"added: {len(self.addedFiles)}")
     self.logger.info(f"updated: {len(self.modifededFiles)}")
     self.logger.info(f"skipped: {len(self.skippedFiles)}")
+
+    self.logger.debug(f"added: {len(self.addedFiles)}")
+    self.logger.debug(f"updated: {len(self.modifededFiles)}")
+    self.logger.debug(f"skipped: {len(self.skippedFiles)}")
+
     return self.addedFiles + self.modifededFiles
