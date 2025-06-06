@@ -76,21 +76,12 @@ class ArticleScraper:
     soup = BeautifulSoup(html, 'html.parser')
     urls = {}
     
-    # Extract links
     for i, link in enumerate(soup.find_all('a', href=True)):
       urls[f"link{i+1}"] = {
         'url': link['href'],
         'text': link.get_text(strip=True),
         'title': link.get('title', '').strip().upper()
       }
-    
-    # Extract images
-    # for i, img in enumerate(soup.find_all('img', src=True)):
-    #   urls[f"img{i+1}"] = {
-    #     'url': img['src'],
-    #     'text': img.get('alt', 'Image'),
-    #     'title': img.get('title', '').strip().upper()
-    #   }
     return urls
 
   def convertToMarkdown(self, htmlContent: str, title: str = "", articleUrl: str = "") -> str:
@@ -108,7 +99,7 @@ class ArticleScraper:
       url = match.group(2).replace('\n', '').replace(' ', '')
 
       for index, item in enumerate(self.urlReferences.values()):
-        if (item['url'] == url):
+        if item['url'] == url:
           formatedUrl = [
             f"\n## {title} - {item['text']} ",
             f"Article URL {index}: {url} ",
